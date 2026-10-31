@@ -30,7 +30,6 @@ if hasattr(sys.stderr, 'reconfigure'):
 
 try:
     import serial
-    import serial.tools.list_ports
 except ImportError:
     print("\n[!] LỖI: Chưa cài đặt thư viện 'pyserial'.")
     print("    Vui lòng cài đặt bằng lệnh:")
@@ -38,6 +37,18 @@ except ImportError:
     print("    Trên Termux (Android):")
     print("    pkg install python && pip install pyserial\n")
     sys.exit(1)
+
+# Lưu ý: Trên Android / Termux, sys.platform == 'android' khiến 'serial.tools.list_ports'
+# in cảnh báo và quăng lỗi ImportError. Ta bọc try-except an toàn:
+comports_func = None
+try:
+    import serial.tools.list_ports
+    comports_func = serial.tools.list_ports.comports
+except (ImportError, Exception):
+    try:
+        from serial.tools.list_ports_linux import comports as comports_func
+    except Exception:
+        comports_func = None
 
 
 class GPSData:
@@ -212,15 +223,16 @@ def parse_nmea_sentence(sentence, gps_data):
 def list_available_ports():
     """Tự động phát hiện các cổng kết nối Serial trên PC và Termux"""
     ports = []
-    # Quét qua pyserial
-    try:
-        found = serial.tools.list_ports.comports()
-        for p in found:
-            ports.append((p.device, p.description))
-    except Exception:
-        pass
+    # 1. Quét qua comports nếu hệ thống hỗ trợ
+    if comports_func is not None:
+        try:
+            found = comports_func()
+            for p in found:
+                ports.append((p.device, getattr(p, 'description', 'Serial Port')))
+        except Exception:
+            pass
 
-    # Quét các đường dẫn Linux / Android / Termux
+    # 2. Quét các đường dẫn Linux / Android / Termux thông dụng
     existing = [p[0] for p in ports]
     extra_paths = (
         glob.glob("/dev/ttyUSB*") +
