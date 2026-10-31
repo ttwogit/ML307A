@@ -47,11 +47,15 @@ Chương trình sẽ tự động quét danh sách cổng kết nối (COM trên
   ```bash
   python read_gps.py -p COM9
   ```
-- **Trên Linux hoặc Termux Android:**
+- **Trên Linux hoặc Termux Android (máy đã root):**
   ```bash
   python3 read_gps.py -p /dev/ttyUSB0
   ```
   *(hoặc `/dev/ttyACM0` tùy theo chip chuyển đổi USB-to-UART)*
+- **Trên Termux Android (máy chưa root, qua TCP Bridge):**
+  ```bash
+  python3 read_gps.py -p socket://localhost:8888
+  ```
 
 ---
 
@@ -59,7 +63,7 @@ Chương trình sẽ tự động quét danh sách cổng kết nối (COM trên
 
 | Tham số | Ý nghĩa | Ví dụ |
 | :--- | :--- | :--- |
-| `-p`, `--port` | Tên cổng Serial | `-p COM9` hoặc `-p /dev/ttyUSB0` |
+| `-p`, `--port` | Tên cổng Serial hoặc URL TCP socket | `-p COM9` hoặc `-p socket://localhost:8888` |
 | `-b`, `--baud` | Tốc độ Baud (mặc định: 115200) | `-b 115200` |
 | `--clear` | Cố định giao diện bảng, xóa màn hình mỗi lần cập nhật | `python read_gps.py --clear` |
 | `--raw` | In trực tiếp các chuỗi NMEA thô từ module | `python read_gps.py --raw` |
@@ -68,15 +72,35 @@ Chương trình sẽ tự động quét danh sách cổng kết nối (COM trên
 
 ---
 
-## 5. Lưu ý quan trọng khi dùng trên Termux (Android)
+## 5. Hướng dẫn xử lý lỗi "Permission Denied" trên Android (Termux)
 
-1. **Kết nối phần cứng:** Sử dụng cáp **USB OTG** cắm từ điện thoại Android vào cổng USB/UART của module.
-2. **Quyền truy cập cổng Serial trên Android:**
-   - Hầu hết các adapter USB-to-UART (CH340, CP2102, FT232, PL2303, STM32 Virtual COM) khi cắm qua OTG trên thiết bị có quyền root sẽ tạo thiết bị tại `/dev/ttyUSB0` hoặc `/dev/ttyACM0`.
-   - Nếu gặp lỗi `Permission Denied`, hãy cấp quyền đọc/ghi bằng lệnh:
-     ```bash
-     su -c 'chmod 666 /dev/ttyUSB0'
-     ```
-3. **Bắt sóng vệ tinh:**
-   - Khi ở trong nhà kín hoặc phòng bê tông, tín hiệu vệ tinh GPS có thể bị chặn (hiển thị `CHƯA ĐỊNH VỊ`).
-   - Hãy đưa ăng-ten GPS ra ngoài trời thoáng hoặc sát cửa sổ. Quá trình bắt sóng lần đầu (Cold Start) thường mất từ 30 giây đến 2 phút.
+Android bảo vệ phần cứng bằng SELinux và phân quyền, khiến Termux không thể mở trực tiếp `/dev/ttyUSB*`. Dưới đây là cách khắc phục:
+
+### Cách 1: Dành cho điện thoại ĐÃ ROOT (Khuyên dùng)
+- Cấp quyền đọc/ghi cho cổng Serial trước khi chạy:
+  ```bash
+  su -c "chmod 666 /dev/ttyUSB*"
+  # hoặc ttyACM nếu là CDC-ACM:
+  su -c "chmod 666 /dev/ttyACM*"
+  ```
+- Hoặc cài `tsu` và chạy bằng quyền root:
+  ```bash
+  pkg install tsu
+  sudo python read_gps.py -p /dev/ttyUSB0
+  ```
+
+### Cách 2: Dành cho điện thoại CHƯA ROOT (Dùng cầu nối TCP)
+Tệp `read_gps.py` hỗ trợ mở socket mạng nhờ `serial.serial_for_url()`.
+1. Cài app **USB Serial TCP Bridge** (hoặc **Serial to TCP Bridge**) từ Google Play hoặc APK.
+2. Cắm cáp OTG module vào điện thoại $\rightarrow$ Bấm **Cho phép** khi hệ thống hỏi quyền truy cập USB.
+3. Thiết lập trên app: Baudrate `115200`, Port TCP `8888` $\rightarrow$ Bật Server.
+4. Mở Termux và chạy lệnh:
+   ```bash
+   python read_gps.py -p socket://localhost:8888
+   ```
+
+---
+
+## 6. Lưu ý về tín hiệu vệ tinh GPS
+- Khi ở trong nhà kín hoặc phòng bê tông, tín hiệu vệ tinh GPS có thể bị chặn (hiển thị `CHƯA ĐỊNH VỊ`).
+- Hãy đưa ăng-ten GPS ra ngoài trời thoáng hoặc sát cửa sổ. Quá trình bắt sóng lần đầu (Cold Start) thường mất từ 30 giây đến 2 phút.
